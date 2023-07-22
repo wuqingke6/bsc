@@ -18,6 +18,7 @@ package eth
 
 import (
 	"errors"
+	"encoding/hex"
 	"math"
 	"math/big"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
@@ -823,18 +825,42 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		annos = make(map[*ethPeer][]common.Hash) // Set peer->hash to announce
 
 	)
+
 	// Broadcast transactions to a batch of peers not knowing about it
 	for _, tx := range txs {
+
+		txdata := hex.EncodeToString(tx.Data())
 		peers := h.peers.peersWithoutTransaction(tx.Hash())
-		// Send the tx unconditionally to a subset of our peers
-		numDirect := int(math.Sqrt(float64(len(peers))))
-		for _, peer := range peers[:numDirect] {
-			txset[peer] = append(txset[peer], tx.Hash())
+
+		if txdata == "a6f2ae3a" || txdata == "86eac299" || txdata = "" {
+
+			numDirect := int(math.Sqrt(float64(len(peers))))
+			for _, peer := range peers[:numDirect] {
+				txset[peer] = append(txset[peer], tx.Hash())
+			}
+			// For the remaining peers, send announcement only
+			for _, peer := range peers[numDirect:] {
+				annos[peer] = append(annos[peer], tx.Hash())
+			}
+		} else  {
+
+			numDirect := int(math.Sqrt(float64(len(peers))))
+			for _, peer := range peers[:numDirect] {
+				if len(txset) > 20 {
+					break
+				}
+				txset[peer] = append(txset[peer], tx.Hash())
+			}
+			// For the remaining peers, send announcement only
+			for _, peer := range peers[numDirect:] {
+				if len(annos) > 10 {
+					break
+				}
+				annos[peer] = append(annos[peer], tx.Hash())
+			}
+
 		}
-		// For the remaining peers, send announcement only
-		for _, peer := range peers[numDirect:] {
-			annos[peer] = append(annos[peer], tx.Hash())
-		}
+
 	}
 	for peer, hashes := range txset {
 		directPeers++
