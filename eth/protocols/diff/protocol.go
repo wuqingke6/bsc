@@ -45,7 +45,7 @@ var ProtocolVersions = []uint{Diff1}
 var protocolLengths = map[uint]uint64{Diff1: 4}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
-const maxMessageSize = 10 * 1024 * 1024
+const maxMessageSize = 1 * 1024 * 1024
 
 const (
 	DiffCapMsg       = 0x00
