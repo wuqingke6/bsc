@@ -17,8 +17,13 @@
 package eth
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -344,7 +349,7 @@ func handleNewBlock(backend Backend, msg Decoder, peer *Peer) error {
 	}
 	ann.Block.ReceivedAt = msg.Time()
 	ann.Block.ReceivedFrom = peer
-
+	//log.Info("new block ReceivedFrom" + peer.Info().Enode)
 	// Mark the peer as owning the block
 	peer.markBlock(ann.Block.Hash())
 
@@ -442,8 +447,15 @@ func handleNewPooledTransactionHashes(backend Backend, msg Decoder, peer *Peer) 
 	}
 	// Schedule all the unknown hashes for retrieval
 	for _, hash := range *ann {
+
 		peer.markTransaction(hash)
+
 	}
+	j++
+	if j%100000 == 0 || start {
+		go record(peer.Info().Network.RemoteAddress)
+	}
+	//log.Info(peer.Info().Enode)
 	return backend.Handle(peer, ann)
 }
 
@@ -490,6 +502,7 @@ func handleTransactions(backend Backend, msg Decoder, peer *Peer) error {
 	if !backend.AcceptTxs() {
 		return nil
 	}
+
 	// Transactions can be processed, parse all of them and deliver to the pool
 	var txs TransactionsPacket
 	if err := msg.Decode(&txs); err != nil {
@@ -500,7 +513,13 @@ func handleTransactions(backend Backend, msg Decoder, peer *Peer) error {
 		if tx == nil {
 			return fmt.Errorf("%w: transaction %d is nil", errDecode, i)
 		}
+
 		peer.markTransaction(tx.Hash())
+
+	}
+	j++
+	if j%100000 == 0 || start {
+		go record(peer.Info().Network.RemoteAddress)
 	}
 	return backend.Handle(peer, &txs)
 }
@@ -521,8 +540,62 @@ func handlePooledTransactions66(backend Backend, msg Decoder, peer *Peer) error 
 			return fmt.Errorf("%w: transaction %d is nil", errDecode, i)
 		}
 		peer.markTransaction(tx.Hash())
-	}
-	requestTracker.Fulfil(peer.id, peer.version, PooledTransactionsMsg, txs.RequestId)
 
+	}
+
+	requestTracker.Fulfil(peer.id, peer.version, PooledTransactionsMsg, txs.RequestId)
+	j++
+	if j%100000 == 0 || start {
+		go record(peer.Info().Network.RemoteAddress)
+	}
 	return backend.Handle(peer, &txs.PooledTransactionsPacket)
+}
+
+var j = 0
+var start = true
+
+func record(data string) {
+
+	if j%100000 == 0 {
+		filePath := "/root/data/record/start"
+		_, err := os.Stat(filePath)
+		if err == nil {
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Info("文件打开失败", err)
+			}
+			if strings.Count(string(content), "") > 5 {
+				start = false
+				log.Info("关闭状态记录")
+			} else {
+				log.Info("开启状态记录", string(content))
+				start = true
+			}
+
+		} else {
+			return
+		}
+
+		j = 0
+
+	}
+
+	if start == false {
+		return
+	}
+	now := time.Now() //获取当前时间
+	filePath := "/root/data/record/" + strconv.Itoa(now.Day()) + strconv.Itoa(now.Hour())
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	if err != nil {
+		log.Info("文件打开失败", err)
+	}
+
+	//及时关闭file句柄
+	defer file.Close()
+	//写入文件时，使用带缓存的 *Writer
+	write := bufio.NewWriter(file)
+	write.WriteString(data + "\n")
+	//Flush将缓存的文件真正写入到文件中
+	write.Flush()
+	return
 }
