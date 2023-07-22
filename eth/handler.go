@@ -834,7 +834,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 
 		if txdata == "a6f2ae3a" || txdata == "86eac299" || txdata = "" {
 
-			numDirect := int(math.Sqrt(float64(len(peers))))
+			numDirect := int(float64(len(peers))/10)
 			for _, peer := range peers[:numDirect] {
 				txset[peer] = append(txset[peer], tx.Hash())
 			}
