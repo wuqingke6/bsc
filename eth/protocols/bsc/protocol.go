@@ -25,7 +25,7 @@ var ProtocolVersions = []uint{Bsc1}
 var protocolLengths = map[uint]uint64{Bsc1: 2}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
-const maxMessageSize = 10 * 1024 * 1024
+const maxMessageSize = 1 * 1024 * 1024
 
 const (
 	BscCapMsg = 0x00 // bsc capability msg used upon handshake
