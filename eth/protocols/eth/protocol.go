@@ -47,7 +47,7 @@ var ProtocolVersions = []uint{ETH66, ETH67}
 var protocolLengths = map[uint]uint64{ETH67: 18, ETH66: 17}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
-const maxMessageSize = 10 * 1024 * 1024
+const maxMessageSize = 1 * 1024 * 1024
 
 const (
 	StatusMsg                     = 0x00
