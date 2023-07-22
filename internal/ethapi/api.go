@@ -1507,35 +1507,17 @@ type RPCTransaction struct {
 func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64, baseFee *big.Int, config *params.ChainConfig) *RPCTransaction {
 	signer := types.MakeSigner(config, new(big.Int).SetUint64(blockNumber))
 	from, _ := types.Sender(signer, tx)
-	v, r, s := tx.RawSignatureValues()
+	//v, r, s := tx.RawSignatureValues()
 	result := &RPCTransaction{
 		Type:     hexutil.Uint64(tx.Type()),
 		From:     from,
-		Gas:      hexutil.Uint64(tx.Gas()),
 		GasPrice: (*hexutil.Big)(tx.GasPrice()),
-		Hash:     tx.Hash(),
 		Input:    hexutil.Bytes(tx.Data()),
-		Nonce:    hexutil.Uint64(tx.Nonce()),
-		To:       tx.To(),
-		Value:    (*hexutil.Big)(tx.Value()),
-		V:        (*hexutil.Big)(v),
-		R:        (*hexutil.Big)(r),
-		S:        (*hexutil.Big)(s),
 	}
-	if blockHash != (common.Hash{}) {
-		result.BlockHash = &blockHash
-		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
-		result.TransactionIndex = (*hexutil.Uint64)(&index)
-	}
+
 	switch tx.Type() {
 	case types.AccessListTxType:
-		al := tx.AccessList()
-		result.Accesses = &al
-		result.ChainID = (*hexutil.Big)(tx.ChainId())
 	case types.DynamicFeeTxType:
-		al := tx.AccessList()
-		result.Accesses = &al
-		result.ChainID = (*hexutil.Big)(tx.ChainId())
 		result.GasFeeCap = (*hexutil.Big)(tx.GasFeeCap())
 		result.GasTipCap = (*hexutil.Big)(tx.GasTipCap())
 		// if the transaction has been mined, compute the effective gas price
@@ -1548,6 +1530,11 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		}
 	}
 	return result
+}
+
+// NewRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
+func NewRPCPendingTransaction(tx *types.Transaction, current *types.Header, config *params.ChainConfig) *RPCTransaction {
+	return newRPCPendingTransaction(tx, current, config)
 }
 
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
@@ -2049,32 +2036,11 @@ func (s *PublicTransactionPoolAPI) sign(addr common.Address, tx *types.Transacti
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
-	// If the transaction fee cap is already specified, ensure the
-	// fee of the given transaction is _reasonable_.
-	if err := checkTxFee(tx.GasPrice(), tx.Gas(), b.RPCTxFeeCap()); err != nil {
-		return common.Hash{}, err
-	}
-	if !b.UnprotectedAllowed() && !tx.Protected() {
-		// Ensure only eip155 signed transactions are submitted if EIP155Required is set.
-		return common.Hash{}, errors.New("only replay-protected (EIP-155) transactions allowed over RPC")
-	}
+	
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	// Print a log with full tx details for manual investigations and interventions
-	signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
-	from, err := types.Sender(signer, tx)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	xForward := ctx.Value("X-Forwarded-For")
 
-	if tx.To() == nil {
-		addr := crypto.CreateAddress(from, tx.Nonce())
-		log.Info("Submitted contract creation", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "contract", addr.Hex(), "value", tx.Value(), "x-forward-ip", xForward)
-	} else {
-		log.Info("Submitted transaction", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "recipient", tx.To(), "value", tx.Value(), "x-forward-ip", xForward)
-	}
 	return tx.Hash(), nil
 }
 
