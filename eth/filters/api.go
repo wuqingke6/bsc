@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/gopool"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -39,6 +40,7 @@ type filter struct {
 	typ      Type
 	deadline *time.Timer // filter is inactiv when deadline triggers
 	hashes   []common.Hash
+	fullTx   bool
 	txs      []*types.Transaction
 	crit     FilterCriteria
 	logs     []*types.Log
@@ -100,20 +102,20 @@ func (api *PublicFilterAPI) timeoutLoop(timeout time.Duration) {
 	}
 }
 
-// NewPendingTransactionFilter creates a filter that fetches pending transactions
+// NewPendingTransactionFilter creates a filter that fetches pending transaction hashes
 // as transactions enter the pending state.
 //
 // It is part of the filter package because this filter can be used through the
 // `eth_getFilterChanges` polling method that is also used for log filters.
 //
 // https://eth.wiki/json-rpc/API#eth_newpendingtransactionfilter
-func (api *PublicFilterAPI) NewPendingTransactionFilter() rpc.ID {
+func (api *PublicFilterAPI) NewPendingTransactionFilter(fullTx *bool) rpc.ID {
 	var (
 		pendingTxs   = make(chan []*types.Transaction)
 		pendingTxSub = api.events.SubscribePendingTxs(pendingTxs)
 	)
 	api.filtersMu.Lock()
-	api.filters[pendingTxSub.ID] = &filter{typ: PendingTransactionsSubscription, deadline: time.NewTimer(api.timeout), txs: make([]*types.Transaction, 0), s: pendingTxSub}
+	api.filters[pendingTxSub.ID] = &filter{typ: PendingTransactionsSubscription, fullTx: fullTx != nil && *fullTx, deadline: time.NewTimer(api.timeout), txs: make([]*types.Transaction, 0), s: pendingTxSub}
 	api.filtersMu.Unlock()
 
 	gopool.Submit(func() {
@@ -148,18 +150,23 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context, fullTx *
 
 	rpcSub := notifier.CreateSubscription()
 
+	isFullTX := fullTx != nil && *fullTx
+
 	gopool.Submit(func() {
 		txs := make(chan []*types.Transaction, 128)
 		pendingTxSub := api.events.SubscribePendingTxs(txs)
+		chainConfig := api.backend.ChainConfig()
 
 		for {
 			select {
 			case txs := <-txs:
 				// To keep the original behaviour, send a single tx hash in one notification.
 				// TODO(rjl493456442) Send a batch of tx hashes in one notification
+				latest := api.backend.CurrentHeader()
 				for _, tx := range txs {
-					if fullTx != nil && *fullTx {
-						notifier.Notify(rpcSub.ID, tx)
+					if isFullTX {
+						rpcTx := ethapi.NewRPCPendingTransaction(tx, latest, chainConfig)
+						notifier.Notify(rpcSub.ID, rpcTx)
 					} else {
 						notifier.Notify(rpcSub.ID, tx.Hash())
 					}
@@ -557,7 +564,7 @@ func (api *PublicFilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 		f.deadline.Reset(api.timeout)
 
 		switch f.typ {
-		case BlocksSubscription, FinalizedHeadersSubscription, VotesSubscription:
+		case BlocksSubscription, VotesSubscription:
 			hashes := f.hashes
 			f.hashes = nil
 			return returnHashes(hashes), nil
