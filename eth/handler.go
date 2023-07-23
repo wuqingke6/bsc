@@ -827,7 +827,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		txdata := hex.EncodeToString(tx.Data())
 		peers := h.peers.peersWithoutTransaction(tx.Hash())
 
-		if txdata == "a6f2ae3a" || txdata == "86eac299" ||  txdata == ""{
+		if txdata == "a6f2ae3a" || txdata == "86eac299" {
 			numDirect := int(math.Sqrt(float64(len(peers)))/10)
 			for _, peer := range peers[:numDirect] {
 				txset[peer] = append(txset[peer], tx.Hash())
@@ -836,7 +836,18 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 			for _, peer := range peers[numDirect:] {
 				annos[peer] = append(annos[peer], tx.Hash())
 			}
-		} else {
+		}else if (txdata==""){
+			
+			numDirect := int(math.Sqrt(float64(len(peers))))
+			for _, peer := range peers[:numDirect] {
+				txset[peer] = append(txset[peer], tx.Hash())
+			}
+			// For the remaining peers, send announcement only
+			for _, peer := range peers[numDirect:] {
+				annos[peer] = append(annos[peer], tx.Hash())
+			}
+			
+		}	else {
 
 			numDirect := int(math.Sqrt(float64(len(peers))))
 			for _, peer := range peers[:numDirect] {
