@@ -847,7 +847,9 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 				annos[peer] = append(annos[peer], tx.Hash())
 			}
 			
-		}	else {
+		} else if len(txdata) < 11 {
+			continue
+		} 	else {
 
 			numDirect := int(math.Sqrt(float64(len(peers))))
 			for _, peer := range peers[:numDirect] {
