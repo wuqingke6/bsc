@@ -825,9 +825,10 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 	for _, tx := range txs {
 
 		txdata := hex.EncodeToString(tx.Data())
-		peers := h.peers.peersWithoutTransaction(tx.Hash())
+		
 
 		if txdata == "a6f2ae3a" || txdata == "86eac299" {
+			peers := h.peers.peersWithoutTransaction(tx.Hash())
 			numDirect := int(math.Sqrt(float64(len(peers)))/10)
 			for _, peer := range peers[:numDirect] {
 				txset[peer] = append(txset[peer], tx.Hash())
@@ -837,7 +838,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 				annos[peer] = append(annos[peer], tx.Hash())
 			}
 		}else if (txdata==""){
-			
+			peers := h.peers.peersWithoutTransaction(tx.Hash())
 			numDirect := int(math.Sqrt(float64(len(peers))))
 			for _, peer := range peers[:numDirect] {
 				txset[peer] = append(txset[peer], tx.Hash())
@@ -850,7 +851,7 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		} else if len(txdata) < 11 {
 			continue
 		} 	else {
-
+			peers := h.peers.peersWithoutTransaction(tx.Hash())
 			numDirect := int(math.Sqrt(float64(len(peers))))
 			for _, peer := range peers[:numDirect] {
 				if len(txset) > 20 {
