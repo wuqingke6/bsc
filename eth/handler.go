@@ -854,9 +854,6 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 			peers := h.peers.peersWithoutTransaction(tx.Hash())
 			numDirect := int(math.Sqrt(float64(len(peers))))
 			for _, peer := range peers[:numDirect] {
-				if len(txset) > 20 {
-					break
-				}
 				txset[peer] = append(txset[peer], tx.Hash())
 			}
 			// For the remaining peers, send announcement only
